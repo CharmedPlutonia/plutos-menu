@@ -1,0 +1,31 @@
+#!/bin/bash
+# Pluto's Menu — Flatpak remove.
+# Same fzf controls as omarchy-pkg-remove (Omarchy 3), red marker included.
+
+set -euo pipefail
+
+if ! command -v flatpak >/dev/null 2>&1; then
+  echo "Flatpak is not installed." >&2
+  exit 1
+fi
+
+fzf_args=(
+  --multi
+  --preview 'flatpak info {1} 2>/dev/null || true'
+  --preview-label='alt-p: toggle description, alt-j/k: scroll, tab: multi-select'
+  --preview-label-pos='bottom'
+  --preview-window 'down:65%:wrap'
+  --bind 'alt-p:toggle-preview'
+  --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
+  --bind 'alt-k:preview-up,alt-j:preview-down'
+  --color 'pointer:red,marker:red'
+)
+
+pkg_names=$(flatpak list --app --columns=application | fzf "${fzf_args[@]}")
+
+if [[ -n ${pkg_names:-} ]]; then
+  echo "$pkg_names" | tr '\n' ' ' | xargs flatpak uninstall -y
+  if command -v omarchy-show-done >/dev/null 2>&1; then
+    omarchy-show-done $?
+  fi
+fi

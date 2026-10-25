@@ -1,0 +1,42 @@
+#!/bin/bash
+# Pluto's Menu — Flathub installer.
+# Same fzf controls as omarchy-pkg-install / omarchy-pkg-aur-install (Omarchy 3):
+#   tab marks more than one app, enter installs the marks (or the highlighted app),
+#   alt-p toggles the description, alt-j/k scroll it.
+
+set -euo pipefail
+
+if ! command -v flatpak >/dev/null 2>&1; then
+  echo "Flatpak is not installed. Installing it from the official repositories…"
+  if [[ -f /usr/bin/omarchy-sudo-keepalive ]] || command -v omarchy-sudo-keepalive >/dev/null 2>&1; then
+    # shellcheck disable=SC1091
+    source omarchy-sudo-keepalive
+  fi
+  sudo pacman -S --noconfirm --needed flatpak
+fi
+
+if ! flatpak remotes | awk '{print $1}' | grep -qx flathub; then
+  flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo \
+    || flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+fi
+
+fzf_args=(
+  --multi
+  --preview 'flatpak remote-info flathub {1} 2>/dev/null || true'
+  --preview-label='alt-p: toggle description, alt-j/k: scroll, tab: multi-select'
+  --preview-label-pos='bottom'
+  --preview-window 'down:65%:wrap'
+  --bind 'alt-p:toggle-preview'
+  --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
+  --bind 'alt-k:preview-up,alt-j:preview-down'
+  --color 'pointer:green,marker:green'
+)
+
+pkg_names=$(flatpak remote-ls --app --columns=application flathub | fzf "${fzf_args[@]}")
+
+if [[ -n ${pkg_names:-} ]]; then
+  echo "$pkg_names" | tr '\n' ' ' | xargs flatpak install -y --user flathub
+  if command -v omarchy-show-done >/dev/null 2>&1; then
+    omarchy-show-done $?
+  fi
+fi
